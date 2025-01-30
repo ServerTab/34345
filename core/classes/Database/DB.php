@@ -425,7 +425,7 @@ class DB
      * @param  string|array $fields Array of data to in "column => value" format to decrement.
      * @return bool         Whether an error occurred or not.
      */
-    public function decrement(string $table, int $id, string $fields): bool
+    public function decrement(string $table, int $id, $fields): bool
     {
         $table = $this->_prefix . $table;
 
