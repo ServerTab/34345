@@ -1,12 +1,21 @@
 <?php
-/*
- *	Made by Samerton
- *  https://github.com/NamelessMC/Nameless/
- *  NamelessMC version 2.1.0
+/**
+ * Profile page
  *
- *  License: MIT
+ * @author Samerton
+ * @license MIT
+ * @version 2.2.0
  *
- *  User profile page
+ * @var Cache $cache
+ * @var FakeSmarty $smarty
+ * @var Language $language
+ * @var Navigation $cc_nav
+ * @var Navigation $navigation
+ * @var Navigation $staffcp_nav
+ * @var Pages $pages
+ * @var TemplateBase $template
+ * @var User $user
+ * @var Widgets $widgets
  */
 
 // Always define page name
@@ -30,7 +39,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
     $page_title = $language->get('user', 'profile');
 }
 
-require_once(ROOT_PATH . '/core/templates/frontend_init.php');
+require_once ROOT_PATH . '/core/templates/frontend_init.php';
 
 $template->assets()->include([
     DARK_MODE
@@ -465,12 +474,12 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
 
     // Set Can view
     if ($profile_user->isPrivateProfile() && !$user->canBypassPrivateProfile()) {
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'PRIVATE_PROFILE' => $language->get('user', 'private_profile_page'),
             'CAN_VIEW' => false
         ]);
     } else {
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'CAN_VIEW' => true
         ]);
     }
@@ -478,7 +487,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
     // Generate Smarty variables to pass to template
     if ($user->isLoggedIn()) {
         // Form token
-        $smarty->assign([
+        $template->getEngine()->addVariables([
             'TOKEN' => Token::get(),
             'LOGGED_IN' => true,
             'SUBMIT' => $language->get('general', 'submit'),
@@ -487,7 +496,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
         ]);
 
         if ($user->hasPermission('profile.private.bypass')) {
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'CAN_VIEW' => true
             ]);
         }
@@ -534,7 +543,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
                 }
             }
 
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'SELF' => true,
                 'SETTINGS_LINK' => URL::build('/user/settings'),
                 'CHANGE_BANNER' => $language->get('user', 'change_banner'),
@@ -543,7 +552,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
             ]);
 
             if ($user->hasPermission('usercp.profile_banner')) {
-                $smarty->assign([
+                $template->getEngine()->addVariables([
                     'UPLOAD_PROFILE_BANNER' => $language->get('user', 'upload_profile_banner'),
                     'PROFILE_BANNER' => $language->get('user', 'profile_banner'),
                     'BROWSE' => $language->get('general', 'browse'),
@@ -552,7 +561,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
                 ]);
             }
         } else {
-            $smarty->assign([
+            $template->getEngine()->addVariables([
                 'MESSAGE_LINK' => URL::build('/user/messaging/', 'action=new&amp;uid=' . urlencode($query->id)),
                 'FOLLOW_LINK' => URL::build('/user/follow/', 'user=' . urlencode($query->id)),
                 'CONFIRM' => $language->get('general', 'confirm'),
@@ -561,19 +570,19 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
 
             // Is the user blocked?
             if ($user->isBlocked($user->data()->id, $query->id)) {
-                $smarty->assign([
+                $template->getEngine()->addVariables([
                     'UNBLOCK_USER' => $language->get('user', 'unblock_user'),
                     'CONFIRM_UNBLOCK_USER' => $language->get('user', 'confirm_unblock_user')
                 ]);
             } else {
-                $smarty->assign([
+                $template->getEngine()->addVariables([
                     'BLOCK_USER' => $language->get('user', 'block_user'),
                     'CONFIRM_BLOCK_USER' => $language->get('user', 'confirm_block_user')
                 ]);
             }
 
             if ($user->hasPermission('modcp.profile_banner_reset')) {
-                $smarty->assign([
+                $template->getEngine()->addVariables([
                     'RESET_PROFILE_BANNER' => $language->get('moderator', 'reset_profile_banner'),
                     'RESET_PROFILE_BANNER_LINK' => URL::build('/profile/' . urlencode($query->username) . '/', 'action=reset_banner')
                 ]);
@@ -581,10 +590,10 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
         }
     }
 
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'NICKNAME' => $profile_user->getDisplayname(true),
         'USERNAME' => $profile_user->getDisplayname(),
-        'GROUPS' => (isset($query) ? $profile_user->getAllGroupHtml() : [Output::getPurified($group)]),
+        'GROUPS' => $profile_user->getAllGroupHtml(),
         'USERNAME_COLOUR' => $profile_user->getGroupStyle(),
         'USER_TITLE' => Output::getClean($query->user_title),
         'FOLLOW' => $language->get('user', 'follow'),
@@ -624,7 +633,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
         $results = $paginator->getLimited($wall_posts_query, 10, $p, count($wall_posts_query));
         $pagination = $paginator->generate(7, URL::build('/profile/' . urlencode($query->username) . '/'));
 
-        $smarty->assign('PAGINATION', $pagination);
+        $template->getEngine()->addVariable('PAGINATION', $pagination);
 
         // Display the correct number of posts
         foreach ($results->data as $nValue) {
@@ -713,17 +722,17 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
             ];
         }
     } else {
-        $smarty->assign('NO_WALL_POSTS', $language->get('user', 'no_wall_posts'));
+        $template->getEngine()->addVariable('NO_WALL_POSTS', $language->get('user', 'no_wall_posts'));
     }
 
-    $smarty->assign('WALL_POSTS', $wall_posts);
+    $template->getEngine()->addVariable('WALL_POSTS', $wall_posts);
 
     if (isset($error)) {
-        $smarty->assign('ERROR', $error);
+        $template->getEngine()->addVariable('ERROR', $error);
     }
 
     if (isset($success)) {
-        $smarty->assign('SUCCESS', $success);
+        $template->getEngine()->addVariable('SUCCESS', $success);
     }
 
     // About tab
@@ -771,10 +780,10 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
             ];
         }
     }
-    $smarty->assign('INTEGRATIONS', $user_integrations);
+    $template->getEngine()->addVariable('INTEGRATIONS', $user_integrations);
 
     if (!count($fields)) {
-        $smarty->assign('NO_ABOUT_FIELDS', $language->get('user', 'no_about_fields'));
+        $template->getEngine()->addVariable('NO_ABOUT_FIELDS', $language->get('user', 'no_about_fields'));
     }
 
     $profile_placeholders = $profile_user->getProfilePlaceholders();
@@ -808,9 +817,9 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
         'value' => $query->profile_views
     ];
 
-    $smarty->assign('ABOUT_FIELDS', $fields);
+    $template->getEngine()->addVariable('ABOUT_FIELDS', $fields);
 
-    $smarty->assign([
+    $template->getEngine()->addVariables([
         'CAN_PROFILE_POST' => $user->isLoggedIn() && $user->hasPermission('profile.post'),
         'REACTIONS' => $all_reactions,
         'REACTIONS_BY_USER' => $reactions_by_user,
@@ -831,7 +840,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
     }
 
     // Assign profile tabs
-    $smarty->assign('TABS', $tabs);
+    $template->getEngine()->addVariable('TABS', $tabs);
 
     if (isset($directories[1]) && !empty($directories[1]) && !isset($_GET['error']) && $user->isLoggedIn() && $user->data()->username == $profile) {
         // Script for banner selector
@@ -841,7 +850,7 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
     }
 
     if (Session::exists('profile_banner_error')) {
-        $smarty->assign('ERROR', Session::flash('profile_banner_error'));
+        $template->getEngine()->addVariable('ERROR', Session::flash('profile_banner_error'));
     }
 
     // Load modules + template
@@ -849,35 +858,39 @@ if (count($profile) >= 3 && ($profile[count($profile) - 1] != 'profile' || $prof
 
     $template->onPageLoad();
 
-    $smarty->assign('WIDGETS_LEFT', $widgets->getWidgets('left', $profile_user));
-    $smarty->assign('WIDGETS_RIGHT', $widgets->getWidgets('right', $profile_user));
+    $template->getEngine()->addVariables([
+        'WIDGETS_LEFT' => $widgets->getWidgets('left', $profile_user),
+        'WIDGETS_RIGHT' => $widgets->getWidgets('right', $profile_user),
+    ]);
 
-    require(ROOT_PATH . '/core/templates/navbar.php');
-    require(ROOT_PATH . '/core/templates/footer.php');
+    require ROOT_PATH . '/core/templates/navbar.php';
+    require ROOT_PATH . '/core/templates/footer.php';
 
     // Display template
-    $template->displayTemplate('profile.tpl', $smarty);
+    $template->displayTemplate('profile');
 } else {
     if (isset($_GET['error'])) {
-        // User not exist
-        $smarty->assign([
+        // User does not exist
+        $template->getEngine()->addVariables([
             'BACK' => $language->get('general', 'back'),
             'HOME' => $language->get('general', 'home'),
-            'NOT_FOUND' => $language->get('user', 'couldnt_find_that_user')
+            'NOT_FOUND' => $language->get('user', 'couldnt_find_that_user'),
         ]);
         // Load modules + template
         Module::loadPage($user, $pages, $cache, $smarty, [$navigation, $cc_nav, $staffcp_nav], $widgets, $template);
 
         $template->onPageLoad();
 
-        $smarty->assign('WIDGETS_LEFT', $widgets->getWidgets('left'));
-        $smarty->assign('WIDGETS_RIGHT', $widgets->getWidgets('right'));
+        $template->getEngine()->addVariables([
+            'WIDGETS_LEFT' => $widgets->getWidgets('left'),
+            'WIDGETS_RIGHT' => $widgets->getWidgets('right'),
+        ]);
 
-        require(ROOT_PATH . '/core/templates/navbar.php');
-        require(ROOT_PATH . '/core/templates/footer.php');
+        require ROOT_PATH . '/core/templates/navbar.php';
+        require ROOT_PATH . '/core/templates/footer.php';
 
         // Display template
-        $template->displayTemplate('user_not_exist.tpl', $smarty);
+        $template->displayTemplate('user_not_exist');
 
         // Search for user
         // TODO
