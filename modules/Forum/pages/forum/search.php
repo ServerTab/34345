@@ -55,97 +55,107 @@ if (!isset($_GET['s'])) {
         }
     }
 } else {
-    $search = Output::getClean(str_replace('+', ' ', $_GET['s']));
-    $search = preg_replace('/[^a-zA-Z0-9 +]+/', '', $search); // alphanumeric only
+    $validation = Validate::check($_GET, [
+        's' => [
+            Validate::REQUIRED => true,
+            Validate::MIN => 3,
+            Validate::MAX => 128
+        ]
+    ]);
 
-    if (isset($_GET['p']) && is_numeric($_GET['p'])) {
-        $p = $_GET['p'];
+    if (!$validation->passed()) {
+        $error = $forum_language->get('forum', 'invalid_search_query', ['min' => 3, 'max' => 128]);
     } else {
-        $p = 1;
-    }
+        $search = Output::getClean(str_replace('+', ' ', $_GET['s']));
+        $search = preg_replace('/[^a-zA-Z0-9 +]+/', '', $search); // alphanumeric only
 
-    if (isset($_SESSION['last_forum_search']) && $_SESSION['last_forum_search_query'] != $_GET['s'] && $_SESSION['last_forum_search'] > strtotime('-1 minute')) {
-        Session::flash('search_error', $forum_language->get('forum', 'search_again_in_x_seconds', ['count' => (60 - (date('U') - $_SESSION['last_forum_search']))]));
-        Redirect::to(URL::build('/forum/search'));
-    }
+        if (isset($_GET['p']) && is_numeric($_GET['p'])) {
+            $p = $_GET['p'];
+        } else {
+            $p = 1;
+        }
 
-    $cache->setCache($search . '-' . rtrim(implode('-', $user_groups), '-'));
-    if (!$cache->isCached('result')) {
-        // Execute search
-        $search_topics = DB::getInstance()->query('SELECT * FROM nl2_topics WHERE topic_title LIKE ?', ['%' . $search . '%'])->results();
-        $search_posts = DB::getInstance()->query('SELECT * FROM nl2_posts WHERE post_content LIKE ?', ['%' . $search . '%'])->results();
+        if (isset($_SESSION['last_forum_search']) && $_SESSION['last_forum_search_query'] != $_GET['s'] && $_SESSION['last_forum_search'] > strtotime('-1 minute')) {
+            Session::flash('search_error', $forum_language->get('forum', 'search_again_in_x_seconds', ['count' => (60 - (date('U') - $_SESSION['last_forum_search']))]));
+            Redirect::to(URL::build('/forum/search'));
+        }
 
-        $search_results = array_merge($search_topics, $search_posts);
+        $cache->setCache($search . '-' . rtrim(implode('-', $user_groups), '-'));
+        if (!$cache->isCached('result')) {
+            // Execute search
+            $search_topics = DB::getInstance()->query('SELECT * FROM nl2_topics WHERE topic_title LIKE ?', ['%' . $search . '%'])->results();
+            $search_posts = DB::getInstance()->query('SELECT * FROM nl2_posts WHERE post_content LIKE ?', ['%' . $search . '%'])->results();
 
-        $results = [];
-        foreach ($search_results as $result) {
-            // Check permissions
-            $perms = DB::getInstance()->get('forums_permissions', ['forum_id', $result->forum_id])->results();
-            foreach ($perms as $perm) {
-                if (in_array($perm->group_id, $user_groups) && $perm->view == 1 && $perm->view_other_topics == 1) {
-                    if (isset($result->topic_id)) {
-                        // Post
-                        if (!isset($results[$result->id]) && $result->deleted == 0) {
-                            // Get associated topic
-                            $topic = DB::getInstance()->get('topics', ['id', $result->topic_id])->results();
-                            if (count($topic) && $topic[0]->deleted === 0) {
-                                $topic = $topic[0];
-                                $results[$result->id] = [
-                                    'post_id' => $result->id,
-                                    'topic_id' => $topic->id,
-                                    'topic_title' => $topic->topic_title,
-                                    'post_author' => $result->post_creator,
-                                    'post_date' => $result->post_date,
-                                    'post_content' => $result->post_content
-                                ];
+            $search_results = array_merge($search_topics, $search_posts);
 
-                                break;
-                            }
+            $results = [];
+            foreach ($search_results as $result) {
+                // Check permissions
+                $perms = DB::getInstance()->get('forums_permissions', ['forum_id', $result->forum_id])->results();
+                foreach ($perms as $perm) {
+                    if (in_array($perm->group_id, $user_groups) && $perm->view == 1 && $perm->view_other_topics == 1) {
+                        if (isset($result->topic_id)) {
+                            // Post
+                            if (!isset($results[$result->id]) && $result->deleted == 0) {
+                                // Get associated topic
+                                $topic = DB::getInstance()->get('topics', ['id', $result->topic_id])->results();
+                                if (count($topic) && $topic[0]->deleted === 0) {
+                                    $topic = $topic[0];
+                                    $results[$result->id] = [
+                                        'post_id' => $result->id,
+                                        'topic_id' => $topic->id,
+                                        'topic_title' => $topic->topic_title,
+                                        'post_author' => $result->post_creator,
+                                        'post_date' => $result->post_date,
+                                        'post_content' => $result->post_content
+                                    ];
 
-                            break;
-                        } else {
-                            break;
-                        }
-                    } else {
-                        // Topic, get associated post
-                        $post = DB::getInstance()->query('SELECT * FROM nl2_posts WHERE topic_id = ? ORDER BY post_date ASC LIMIT 1', [$result->id]);
-                        if ($post->count()) {
-                            $post = $post->first();
-                            if (!isset($results[$post->id]) && $post->deleted == 0) {
-                                $results[$post->id] = [
-                                    'post_id' => $post->id,
-                                    'topic_id' => $result->id,
-                                    'topic_title' => $result->topic_title,
-                                    'post_author' => $post->post_creator,
-                                    'post_date' => $post->post_date,
-                                    'post_content' => $post->post_content
-                                ];
+                                    break;
+                                }
 
                                 break;
+                            } else {
+                                break;
                             }
-
-                            break;
                         } else {
-                            break;
+                            // Topic, get associated post
+                            $post = DB::getInstance()->query('SELECT * FROM nl2_posts WHERE topic_id = ? ORDER BY post_date ASC LIMIT 1', [$result->id]);
+                            if ($post->count()) {
+                                $post = $post->first();
+                                if (!isset($results[$post->id]) && $post->deleted == 0) {
+                                    $results[$post->id] = [
+                                        'post_id' => $post->id,
+                                        'topic_id' => $result->id,
+                                        'topic_title' => $result->topic_title,
+                                        'post_author' => $post->post_creator,
+                                        'post_date' => $post->post_date,
+                                        'post_content' => $post->post_content
+                                    ];
+
+                                    break;
+                                }
+
+                                break;
+                            } else {
+                                break;
+                            }
                         }
+
                     }
-
                 }
             }
-        }
 
-        $results = array_values($results);
-        $cache->store('result', $results, 60);
+            $results = array_values($results);
+            $cache->store('result', $results, 60);
 
-        if (!isset($_SESSION['last_forum_search_query']) || $_SESSION['last_forum_search_query'] != $_GET['s']) {
-            $_SESSION['last_forum_search'] = date('U');
-            $_SESSION['last_forum_search_query'] = $_GET['s'];
+            if (!isset($_SESSION['last_forum_search_query']) || $_SESSION['last_forum_search_query'] != $_GET['s']) {
+                $_SESSION['last_forum_search'] = date('U');
+                $_SESSION['last_forum_search_query'] = $_GET['s'];
+            }
+        } else {
+            $results = $cache->retrieve('result');
         }
-    } else {
-        $results = $cache->retrieve('result');
     }
-
-    $input = true;
 }
 
 if (!isset($_GET['s'])) {
@@ -153,13 +163,14 @@ if (!isset($_GET['s'])) {
 } else {
     $page_title = $forum_language->get('forum', 'forum_search') . ' - ' . Output::getClean(substr($search, 0, 20)) . ' - ' . $language->get('general', 'page_x', ['page' => $p]);
 }
-require_once(ROOT_PATH . '/core/templates/frontend_init.php');
+
+require_once ROOT_PATH . '/core/templates/frontend_init.php';
 
 $template->assets()->include([
     AssetTree::TINYMCE,
 ]);
 
-if (isset($_GET['s'])) {
+if (!isset($error) && isset($_GET['s'])) {
     // Show results
     if (count($results)) {
         $paginator = new Paginator(
